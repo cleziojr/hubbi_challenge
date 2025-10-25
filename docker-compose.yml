@@ -1,0 +1,67 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    container_name: hubbi-postgres
+    environment:
+      POSTGRES_USER: ${DB_USUARIO}
+      POSTGRES_PASSWORD: ${DB_SENHA}
+      POSTGRES_DB: ${DB_DATABASE}
+    ports:
+      - "${DB_PORTA}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - hubbi_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USUARIO} -d ${DB_DATABASE}"]
+      interval: 5s
+      retries: 5
+      timeout: 5s
+      start_period: 5s
+
+  selenium-firefox:
+    image: selenium/standalone-firefox:latest
+    container_name: hubbi-firefox
+    shm_size: 2g
+    networks:
+      - hubbi_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/wd/hub/status"]
+      interval: 5s
+      retries: 5
+      timeout: 5s
+      start_period: 5s
+
+  app:
+    build: .
+    container_name: hubbi-app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    networks:
+      - hubbi_net
+    depends_on:
+      db:
+        condition: service_healthy
+      selenium-firefox:
+        condition: service_healthy
+    environment:
+      DB_HOST: hubbi-postgres
+      DB_PORT: 5432
+      DB_USUARIO: ${DB_USUARIO}
+      DB_SENHA: ${DB_SENHA}
+      DB_DATABASE: ${DB_DATABASE}
+      SELENIUM_HOST: hubbi-firefox
+
+networks:
+  hubbi_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+

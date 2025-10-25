@@ -75,6 +75,92 @@ Depois faça logout/login para aplicar.
 
 ---
 
+## 🔄 Restaurando o banco a partir do `.dump`
+
+E caso você queira restaurar os dados a partir do arquivo `.dump` (por exemplo, para iniciar a pipeline com os dados já carregados), siga o passo a passo abaixo. **Importante:** reflita antes de subir o container se você deseja restaurar ou não, para evitar inconsistências.
+
+O backup binário está localizado em `./data/hubbi_dw_backup.dump`.
+
+### 1️⃣ Restaurar antes de subir o container (recomendado)
+
+1. Certifique-se de que nenhum container do PostgreSQL está rodando:
+
+```bash
+docker compose down
+```
+
+2. Suba apenas o serviço do banco (opcional, mas útil para controle):
+
+```bash
+docker compose up -d db
+```
+
+3. Acesse o shell do container:
+
+```bash
+docker compose exec db bash
+```
+
+4. Crie o banco vazio:
+
+```bash
+createdb -U hubbi hubbi_dw
+```
+
+5. Restaure o dump dentro do container:
+
+```bash
+pg_restore -U hubbi -d hubbi_dw /data/hubbi_dw_backup.dump
+```
+
+6. Saia do container (`exit`) e então suba os demais serviços normalmente:
+
+```bash
+docker compose up -d --build
+docker compose logs -f app
+```
+
+---
+
+### 2️⃣ Restaurar com o container já em execução
+
+Se você já subiu o container `db` com a aplicação:
+
+1. Acesse o container:
+
+```bash
+docker compose exec db bash
+```
+
+2. Crie um banco novo (ou drope o existente, se quiser sobrescrever):
+
+```bash
+dropdb -U hubbi hubbi_dw
+createdb -U hubbi hubbi_dw
+```
+
+3. Restaure o dump:
+
+```bash
+pg_restore -U hubbi -d hubbi_dw /data/hubbi_dw_backup.dump
+```
+
+4. Reinicie o container da aplicação (`app`) para garantir que ela se conecte ao banco atualizado:
+
+```bash
+docker compose restart app
+```
+
+---
+
+### 💡 Observações importantes
+
+* Restaurar o dump **antes de subir o container** é mais seguro e evita inconsistências.
+* Se optar por restaurar com o container já rodando, lembre-se de dropar/recriar o banco ou usar um banco alternativo.
+* O `.dump` é binário (`pg_dump -Fc`), garantindo que **tabelas, índices e dados** sejam restaurados exatamente como estavam.
+
+---
+
 ## Executando a pipeline
 
 ### 1. Clone o repositório
